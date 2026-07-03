@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 끓이기 타이쿤 - 알파 버전</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .game-container {
+            width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        h1 { text-align: center; color: #ff4500; margin-top: 0; }
+        .status-bar {
+            background: #eee;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        .section {
+            border: 1px solid #ddd;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .section h3 { margin-top: 0; margin-bottom: 10px; color: #333; }
+        button {
+            background: #ff7f50;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 14px;
+        }
+        button:hover { background: #ff4500; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+        #log {
+            height: 80px;
+            overflow-y: auto;
+            background: #333;
+            color: #fff;
+            padding: 8px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🍜 라면 타이쿤 (Alpha)</h1>
+    
+    <div class="status-bar">
+        <div>돈: <span id="gold">0</span>원</div>
+        <div>초당 자동 수익: <span id="gps">0</span>원/초</div>
+    </div>
+
+    <div class="section">
+        <h3>1. 라면 조리하기</h3>
+        <p>현재 선택: 냄비(<span id="selected-pot">양은냄비</span>) | 토핑(<span id="selected-toppings">없음</span>)</p>
+        <div class="flex-wrap">
+            <button onclick="addTopping('계란')">계란 넣기</button>
+            <button onclick="addTopping('파')">파 넣기</button>
+            <button onclick="addTopping('대게')">대게 넣기</button>
+        </div>
+        <br>
+        <button style="width:100%; background:#2ed573; font-size:16px; font-weight:bold;" onclick="cookRamyeon()">
+            🔥 라면 완성해서 시식가에게 주기
+        </button>
+    </div>
+
+    <div class="section">
+        <h3>2. 재료 및 냄비 업그레이드</h3>
+        <div class="flex-wrap">
+            <button id="btn-upgrade-pot" onclick="upgradePot()">냄비 강화 (비용: 100원)</button>
+            <button id="btn-upgrade-topping" onclick="upgradeToppingMultiplier()">토핑 가치 업그레이드 (비용: 150원)</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>3. 가게 인수 (방치형 수익)</h3>
+        <p>소유한 가게 수: <span id="shop-count">0</span>개</p>
+        <button id="btn-buy-shop" onclick="buyShop()">분식집 사기 (비용: 500원)</button>
+    </div>
+
+    <div class="section">
+        <h3>게임 피드백</h3>
+        <div id="log">게임이 시작되었습니다. 라면을 끓여서 돈을 버세요!</div>
+    </div>
+</div>
+
+<script>
+    // --- 게임 데이터 및 상태 ---
+    let gameState = {
+        gold: 0,
+        potLevel: 1,      // 냄비 레벨 (판매 금액 배수 증가)
+        toppingLevel: 1,  // 토핑 레벨 (토핑당 보너스 금액 증가)
+        shopCount: 0,     // 소유한 가게 수
+        currentToppings: []
+    };
+
+    // 가격 및 밸런스 설정
+    const COST = {
+        potUpgrade: 100,
+        toppingUpgrade: 150,
+        shop: 500
+    };
+
+    // 토핑별 기본 가치
+    const toppingValues = {
+        '계란': 20,
+        '파': 10,
+        '대게': 100
+    };
+
+    // --- 게임 로직 함수 ---
+
+    // 로그 기록
+    function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${message}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // 화면 갱신
+    function updateUI() {
+        document.getElementById('gold').innerText = gameState.gold;
+        document.getElementById('gps').innerText = gameState.shopCount * 20; // 가게당 초당 20원
+        document.getElementById('selected-pot').innerText = `Lv.${gameState.potLevel} 냄비`;
+        document.getElementById('selected-toppings').innerText = gameState.currentToppings.length > 0 ? gameState.currentToppings.join(', ') : '없음';
+        document.getElementById('shop-count').innerText = gameState.shopCount;
+
+        // 버튼 활성화/비활성화 체크
+        document.getElementById('btn-upgrade-pot').disabled = gameState.gold < COST.potUpgrade;
+        document.getElementById('btn-upgrade-topping').disabled = gameState.gold < COST.toppingUpgrade;
+        document.getElementById('btn-buy-shop').disabled = gameState.gold < COST.shop;
+    }
+
+    // 토핑 추가
+    function addTopping(name) {
+        if (gameState.currentToppings.length >= 3) {
+            log("토핑은 최대 3개까지만 넣을 수 있습니다!");
+            return;
+        }
+        gameState.currentToppings.push(name);
+        updateUI();
+    }
+
+    // 라면 끓이기 (판매)
+    function cookRamyeon() {
+        // 기본 가격 100원
+        let basePrice = 100;
+        
+        // 토핑 점수 계산
+        let toppingPrice = 0;
+        gameState.currentToppings.forEach(t => {
+            toppingPrice += toppingValues[t] * gameState.toppingLevel;
+        });
+
+        // 최종 금액 = (기본가 + 토핑가) * 냄비 레벨
+        let finalEarned = (basePrice + toppingPrice) * gameState.potLevel;
+
+        gameState.gold += finalEarned;
+        
+        log(`시식가가 라면을 먹었습니다! 조합 가치 평가로 [${finalEarned}원]을 획득했습니다.`);
+        
+        // 조리실 초기화
+        gameState.currentToppings = [];
+        updateUI();
+    }
+
+    // 냄비 업그레이드
+    function upgradePot() {
+        if (gameState.gold >= COST.potUpgrade) {
+            gameState.gold -= COST.potUpgrade;
+            gameState.potLevel++;
+            log(`냄비를 업그레이드했습니다! (현재 Lv.${gameState.potLevel}) 이제 모든 라면 가격이 상승합니다.`);
+            updateUI();
+        }
+    }
+
+    // 토핑 가치 업그레이드
+    function upgradeToppingMultiplier() {
+        if (gameState.gold >= COST.toppingUpgrade) {
+            gameState.gold -= COST.toppingUpgrade;
+            gameState.toppingLevel++;
+            log(`토핑 연구를 완료했습니다! (현재 Lv.${gameState.toppingLevel}) 토핑의 가치가 상승합니다.`);
+            updateUI();
+        }
+    }
+
+    // 가게 구매
+    function buyShop() {
+        if (gameState.gold >= COST.shop) {
+            gameState.gold -= COST.shop;
+            gameState.shopCount++;
+            log(`새로운 분점 가게를 매입했습니다! 이제 초당 자동으로 돈이 벌립니다.`);
+            updateUI();
+        }
+    }
+
+    // --- 방치형 시스템 (초당 자동 수익) ---
+    setInterval(() => {
+        if (gameState.shopCount > 0) {
+            // 가게당 초당 20원씩 지급
+            gameState.gold += (gameState.shopCount * 20);
+            updateUI();
+        }
+    }, 1000);
+
+    // 초기 UI 업데이트
+    updateUI();
+</script>
+
+</body>
+</html>

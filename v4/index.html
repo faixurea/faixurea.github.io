@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 재벌 타이쿤 - 코딩 코맨드 버전</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #2c3e50;
+            color: #333;
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+        .game-container {
+            width: 1000px;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 { text-align: center; color: #e74c3c; margin: 0 0 20px 0; font-size: 30px; }
+        
+        .status-bar {
+            background: #1a252f; color: #fff; padding: 15px 25px;
+            border-radius: 8px; margin-bottom: 20px;
+            font-weight: bold; font-size: 20px;
+            display: flex; justify-content: space-between;
+        }
+        .status-bar .gold-text { color: #f1c40f; }
+        .status-bar .gps-text { color: #2ecc71; font-size: 16px; align-self: center; }
+
+        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 12px; font-size: 16px; background: #7f8c8d;
+            color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+        .tab-btn.active { background: #e67e22; }
+
+        .game-content { display: none; }
+        .game-content.active { display: block; }
+
+        .layout-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+        .section { background: #f8f9fa; border: 2px solid #bdc3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .section h3 { margin-top: 0; margin-bottom: 12px; color: #2c3e50; border-bottom: 2px solid #e67e22; padding-bottom: 5px; }
+
+        button {
+            background: #e67e22; color: white; border: none; padding: 10px 14px;
+            border-radius: 6px; cursor: pointer; font-weight: bold;
+        }
+        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+        
+        /* 코딩 및 콘솔 스타일 */
+        .console-box { display: grid; grid-template-columns: 1fr 1.2fr; gap: 15px; }
+        .code-input {
+            width: 100%; height: 120px; background: #111; color: #00ff00;
+            font-family: monospace; border: 2px solid #333; padding: 10px;
+            box-sizing: border-box; border-radius: 6px; font-size: 14px; resize: none;
+        }
+        .help-box { background: #eef2f5; padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.6; border-left: 4px solid #3498db; }
+        
+        /* 지도 스타일 */
+        .map-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; background: #ecf0f1; padding: 15px; border-radius: 10px; }
+        .map-node { background: #fff; border: 3px solid #95a5a6; border-radius: 8px; padding: 12px; text-align: center; }
+        .map-node.event-good { border-color: #2ecc71; background: #f0fff4; }
+        .map-node.event-bad { border-color: #e74c3c; background: #fff5f5; }
+
+        #log {
+            height: 100px; overflow-y: auto; background: #1a252f; color: #3498db;
+            padding: 12px; font-size: 13px; font-family: monospace; border-radius: 6px; margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🍜 라면 재벌 타이쿤 (직원 프로그래밍 편)</h1>
+    
+    <div class="status-bar">
+        <div>보유 자금: <span id="gold" class="gold-text">500</span>원</div>
+        <div id="gps" class="gps-text">가맹점 자동 수익: 0원/초</div>
+    </div>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" id="tab-kitchen" onclick="switchTab('kitchen')">🍳 본점 주방 & 직원 명령</button>
+        <button class="tab-btn" id="tab-map" onclick="switchTab('map')">🗺️ 전국 가맹점 상황 (<span id="event-count">0</span>)</button>
+    </div>
+
+    <div id="content-kitchen" class="game-content active">
+        <div class="layout-grid">
+            <div>
+                <div class="section">
+                    <h3>🤖 AI 직원 자동화 콘솔</h3>
+                    <p style="font-size: 13px; margin-top:0;">아래에 명령어를 입력하고 실행하면 직원이 대신 행동합니다.</p>
+                    <div class="console-box">
+                        <div>
+                            <textarea id="command-input" class="code-input" placeholder="cook()&#10;solve(1)"></textarea>
+                            <button style="width:100%; margin-top:5px; background:#2ecc71;" onclick="runCommand()">명령 전송 (Run)</button>
+                        </div>
+                        <div class="help-box">
+                            <strong>[명령어 도움말]</strong><br>
+                            • <code>cook()</code> : 본점에서 라면을 한 번 끓여서 팝니다.<br>
+                            • <code>solve(가맹점번호)</code> : 해당 가맹점의 문제를 즉시 해결하러 출장을 보냅니다.<br>
+                            * 예시: 1호점 해결은 <code>solve(1)</code> 입력
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>1. 수동 라면 서빙</h3>
+                    <p style="font-size:13px; margin:0 0 5px 0;">토핑: 계란(20원), 파(10원), 대게(150원)</p>
+                    <div class="flex-wrap">
+                        <button onclick="buyTopping('계란')">계란</button>
+                        <button onclick="buyTopping('파')">파</button>
+                        <button onclick="buyTopping('대게')">대게</button>
+                        <button id="btn-serve" style="background:#27ae60;" onclick="cookRamyeon()">🔥 직접 라면 제출</button>
+                    </div>
+                    <span id="selected-toppings" style="font-size:12px; color:#666;">선택된 토핑: 없음</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="section">
+                    <h3>2. 본점 연구 및 확장</h3>
+                    <div class="flex-wrap" style="margin-bottom: 10px;">
+                        <button id="btn-upgrade-pot" onclick="upgradePot()">냄비 강화 (<span id="pot-cost">300</span>원)</button>
+                    </div>
+                    <button id="btn-buy-shop" style="background:#2980b9; width:100%;" onclick="buyShop()">
+                        🏠 다음 가맹점 인수 (비용: <span id="shop-cost">500</span>원)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-map" class="game-content">
+        <div class="section">
+            <h3>전국 가맹점 모니터링</h3>
+            <div class="map-grid" id="map-grid"></div>
+        </div>
+    </div>
+
+    <div id="log">> 게임이 시작되었습니다. 명령어 콘솔을 이용해 직원을 부려보세요!</div>
+</div>
+
+<script>
+    let gameState = {
+        gold: 500,
+        potLevel: 1,
+        ownedShops: 0,
+        currentToppings: []
+    };
+
+    const shopData = [
+        { id: 1, name: "1호점 (홍대점)", profit: 40, activeEvent: null },
+        { id: 2, name: "2호점 (강남점)", profit: 90, activeEvent: null },
+        { id: 3, name: "3호점 (부산점)", profit: 160, activeEvent: null },
+        { id: 4, name: "4호점 (제주점)", profit: 250, activeEvent: null }
+    ];
+
+    // 호재(돈 획득) 및 악재(돈 차감/해결필요) 이벤트 정의
+    const eventPool = [
+        { type: "good", text: "🍀 유명 인플루언서 방문 호재!", reward: 400 },
+        { type: "good", text: "🍀 신메뉴 대박 행진!", reward: 600 },
+        { type: "bad", text: "⚠️ 위생 점검 경고 발생!", reward: 500 }, // 해결 시 주는 돈
+        { type: "bad", text: "⚠️ 진상 손님 컴플레인!", reward: 700 }
+    ];
+
+    function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${message}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function switchTab(tab) {
+        document.getElementById('tab-kitchen').classList.remove('active');
+        document.getElementById('tab-map').classList.remove('active');
+        document.getElementById('content-kitchen').classList.remove('active');
+        document.getElementById('content-map').classList.remove('active');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        document.getElementById(`content-${tab}`).classList.add('active');
+        if(tab === 'map') renderMap();
+    }
+
+    function getCurrentShopCost() { return 500 * Math.pow(3, gameState.ownedShops); }
+    function getPotUpgradeCost() { return 300 * gameState.potLevel; }
+
+    function updateUI() {
+        document.getElementById('gold').innerText = Math.floor(gameState.gold).toLocaleString();
+        
+        let gps = 0;
+        for(let i=0; i<gameState.ownedShops; i++) gps += shopData[i].profit;
+        document.getElementById('gps').innerText = `가맹점 자동 수익: ${gps.toLocaleString()}원/초`;
+        
+        document.getElementById('selected-toppings').innerText = "선택된 토핑: " + (gameState.currentToppings.length ? gameState.currentToppings.join(', ') : '없음');
+        document.getElementById('shop-cost').innerText = Math.floor(getCurrentShopCost()).toLocaleString();
+        document.getElementById('pot-cost').innerText = getPotUpgradeCost().toLocaleString();
+
+        document.getElementById('btn-upgrade-pot').disabled = gameState.gold < getPotUpgradeCost();
+        document.getElementById('btn-buy-shop').disabled = (gameState.gold < getCurrentShopCost()) || (gameState.ownedShops >= shopData.length);
+        
+        let activeBads = shopData.filter(s => s.activeEvent && s.activeEvent.type === "bad").length;
+        document.getElementById('event-count').innerText = activeBads + "개 문제";
+    }
+
+    // --- 직원 프로그래밍 언어 해석기 (Interpreter) ---
+    function runCommand() {
+        const input = document.getElementById('command-input').value.trim();
+        
+        if (input === "cook()") {
+            log("[명령 실행] 직원이 라면 조리를 시작합니다.");
+            cookRamyeon();
+        } else if (input.startsWith("solve(") && input.endsWith(")")) {
+            // 괄호 안의 숫자 추출
+            let numStr = input.replace("solve(", "").replace(")", "");
+            let shopId = parseInt(numStr);
+            
+            if (shopId > 0 && shopId <= gameState.ownedShops) {
+                let shopIndex = shopId - 1;
+                let shop = shopData[shopIndex];
+                if (shop.activeEvent && shop.activeEvent.type === "bad") {
+                    let rwd = shop.activeEvent.reward;
+                    gameState.gold += rwd;
+                    log(`[명령 실행] 직원이 ${shop.name}로 출근해 문제를 해결했습니다! (+${rwd}원)`);
+                    shop.activeEvent = null;
+                    updateUI();
+                } else {
+                    log(`[콘솔 오류] ${shop.name}에는 현재 처리할 문제가 없습니다.`);
+                }
+            } else {
+                log("[콘솔 오류] 올바르지 않거나 아직 인수하지 않은 가맹점 번호입니다.");
+            }
+        } else {
+            log("[구문 에러] 명령어가 잘못되었습니다. 도움말을 확인하세요.");
+        }
+    }
+
+    // --- 일반 게임 기능들 ---
+    function buyTopping(name) {
+        let cost = name==='계란'? 20 : name==='파'? 10 : 150;
+        if(gameState.gold >= cost && gameState.currentToppings.length < 3) {
+            gameState.gold -= cost;
+            gameState.currentToppings.push(name);
+            updateUI();
+        }
+    }
+
+    function cookRamyeon() {
+        let price = 120 * gameState.potLevel;
+        gameState.currentToppings.forEach(() => price += 40);
+        gameState.gold += price;
+        log(`[주방] 라면 판매 완료! 기본 및 토핑 정산으로 ${price}원을 벌었습니다.`);
+        gameState.currentToppings = [];
+        updateUI();
+    }
+
+    function upgradePot() {
+        let cost = getPotUpgradeCost();
+        if(gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.potLevel++;
+            log(`[업그레이드] 냄비가 Lv.${gameState.potLevel}로 강화되었습니다.`);
+            updateUI();
+        }
+    }
+
+    function buyShop() {
+        let cost = getCurrentShopCost();
+        if(gameState.gold >= cost && gameState.ownedShops < shopData.length) {
+            gameState.gold -= cost;
+            gameState.ownedShops++;
+            log(`[가맹점] ${shopData[gameState.ownedShops-1].name}을(를) 오픈했습니다!`);
+            updateUI();
+        }
+    }
+
+    function renderMap() {
+        const grid = document.getElementById('map-grid');
+        grid.innerHTML = '';
+        shopData.forEach((shop, idx) => {
+            const node = document.createElement('div');
+            node.className = 'map-node';
+            if (idx >= gameState.ownedShops) {
+                node.innerHTML = `<h3>${idx+1}호점 (미오픈)</h3><p>인수 필요</p>`;
+            } else {
+                node.innerHTML = `<h3>${shop.name}</h3><p>수익: ${shop.profit}원/초</p>`;
+                if (shop.activeEvent) {
+                    node.classList.add(shop.activeEvent.type === 'good' ? 'event-good' : 'event-bad');
+                    node.innerHTML += `<p style="font-weight:bold;">${shop.activeEvent.text}</p>`;
+                } else {
+                    node.innerHTML += `<p style="color:green;">상태 정상</p>`;
+                }
+            }
+            grid.appendChild(node);
+        });
+    }
+
+    // --- 타이머 시스템 ---
+    // 1. 방치형 수익 정산
+    setInterval(() => {
+        let gps = 0;
+        for(let i=0; i<gameState.ownedShops; i++) gps += shopData[i].profit;
+        if(gps > 0) {
+            gameState.gold += gps;
+            updateUI();
+        }
+    }, 1000);
+
+    // 2. 이벤트 발생 주기 축소 (25초에 한번씩 발생하여 덜 자주 일어남)
+    setInterval(() => {
+        if (gameState.ownedShops > 0) {
+            let idx = Math.floor(Math.random() * gameState.ownedShops);
+            let shop = shopData[idx];
+            
+            if (!shop.activeEvent) {
+                let ev = eventPool[Math.floor(Math.random() * eventPool.length)];
+                shop.activeEvent = ev;
+                
+                if (ev.type === "good") {
+                    gameState.gold += ev.reward;
+                    log(`🎉 [호재 대박] ${shop.name}에 좋은 일이 생겨 즉시 보너스 현금 ${ev.reward}원이 들어왔습니다!`);
+                    shop.activeEvent = null; // 호재는 즉시 정산 후 소멸
+                } else {
+                    log(`🚨 [경고] ${shop.name}에 문제가 터졌습니다! 콘솔 명령어로 직원을 보내세요.`);
+                }
+                updateUI();
+                if(document.getElementById('content-map').classList.contains('active')) renderMap();
+            }
+        }
+    }, 25000);
+
+    updateUI();
+</script>
+</body>
+</html>

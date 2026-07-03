@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 타이쿤 - 마스터 버전</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #2c3e50;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .game-container {
+            width: 950px;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 { text-align: center; color: #e74c3c; margin: 0 0 20px 0; font-size: 30px; }
+        
+        /* 상단 전광판 */
+        .status-bar {
+            background: #1a252f;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status-bar .gold-text { color: #f1c40f; }
+        .status-bar .gps-text { color: #2ecc71; font-size: 16px; align-self: center; }
+
+        /* 탭 메뉴 (주방 vs 지도) */
+        .tab-menu {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            font-size: 18px;
+            background: #7f8c8d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .tab-btn.active { background: #e67e22; }
+
+        /* 메인 콘텐츠 영역 */
+        .game-content { display: none; }
+        .game-content.active { display: block; }
+
+        /* 주방 레이아웃 */
+        .kitchen-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 20px;
+        }
+        .section {
+            background: #f8f9fa;
+            border: 2px solid #bdc3c7;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .section h3 { margin-top: 0; margin-bottom: 12px; color: #2c3e50; border-bottom: 2px solid #e67e22; padding-bottom: 5px; }
+
+        /* 버튼 및 쿨타임 */
+        button {
+            background: #e67e22; color: white; border: none; padding: 10px 14px;
+            border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.1s;
+        }
+        button:hover { background: #d35400; }
+        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+        
+        .cooking-display { background: #edf2f7; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+        .cooldown-bar-container { width: 100%; background: #ddd; height: 12px; border-radius: 6px; margin-top: 10px; overflow: hidden; display: none; }
+        .cooldown-bar { width: 0%; height: 100%; background: #e74c3c; transition: width 0.1s linear; }
+        .serve-btn { width: 100%; background: #2ecc71; font-size: 18px; padding: 12px; margin-top: 10px; }
+        .serve-btn:hover { background: #27ae60; }
+
+        /* 🗺️ 지도 UI 시스템 */
+        .map-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 10px;
+            min-height: 300px;
+        }
+        .map-node {
+            background: #fff;
+            border: 3px solid #95a5a6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .map-node.locked { background: #e0e0e0; color: #7f8c8d; border-style: dashed; }
+        .map-node.event-active { border-color: #e74c3c; background: #fdf2f2; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        .event-box {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f1c40f;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* 하단 로그 시스템 */
+        #log {
+            height: 100px; overflow-y: auto; background: #1a252f; color: #3498db;
+            padding: 12px; font-size: 13px; font-family: monospace; border-radius: 6px; margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🍜 라면 재벌 타이쿤 (가맹점 관리 편)</h1>
+    
+    <div class="status-bar">
+        <div>보유 자금: <span id="gold" class="gold-text">500</span>원</div>
+        <div id="gps" class="gps-text">가맹점 자동 수익: 0원/초</div>
+    </div>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" id="tab-kitchen" onclick="switchTab('kitchen')">🍳 본점 주방 (라면 조리)</button>
+        <button class="tab-btn" id="tab-map" onclick="switchTab('map')">🗺️ 전국 가맹점 지도 (<span id="event-count">0</span>개 문제 발생)</button>
+    </div>
+
+    <div id="content-kitchen" class="game-content active">
+        <div class="kitchen-layout">
+            <div>
+                <div class="section">
+                    <h3>1. 라면 개발 및 서빙</h3>
+                    <div class="cooking-display">
+                        <strong>현재 조리도구:</strong> <span id="selected-pot">Lv.1 양은냄비</span><br>
+                        <strong>추가된 토핑:</strong> <span id="selected-toppings">없음</span>
+                    </div>
+                    <div class="flex-wrap">
+                        <button id="btn-top-egg" onclick="buyTopping('계란')">계란 (+20원)</button>
+                        <button id="btn-top-green" onclick="buyTopping('파')">파 (+10원)</button>
+                        <button id="btn-top-crab" onclick="buyTopping('대게')">대게 (+150원)</button>
+                    </div>
+                    <div class="cooldown-bar-container" id="cooldown-container">
+                        <div class="cooldown-bar" id="cooldown-bar"></div>
+                    </div>
+                    <button id="btn-serve" class="serve-btn" onclick="cookRamyeon()">🔥 시식가에게 라면 제출 (3초 조리)</button>
+                </div>
+            </div>
+            <div>
+                <div class="section">
+                    <h3>2. 본점 업그레이드</h3>
+                    <div class="flex-wrap">
+                        <button id="btn-upgrade-pot" onclick="upgradePot()">냄비 강화 (비용: 300원)</button>
+                        <button id="btn-upgrade-topping" onclick="upgradeToppingMultiplier()">연구 소스 강화 (비용: 400원)</button>
+                    </div>
+                </div>
+                <div class="section">
+                    <h3>3. 가맹점 신규 인수</h3>
+                    <p style="font-size:13px; color:#e67e22; font-weight:bold;">※ 인수할 때마다 다음 체인점의 가격이 폭등합니다!</p>
+                    <button id="btn-buy-shop" style="background:#2980b9; width:100%; font-size:16px;" onclick="buyShop()">
+                        🏠 다음 가맹점 인수 (비용: <span id="shop-cost">500</span>원)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-map" class="game-content">
+        <div class="section">
+            <h3>전국 가맹점 모니터링</h3>
+            <p>인수한 가맹점들이 지도에 표시됩니다. 정기적으로 발생하는 문제를 해결해 보너스 자금을 획득하세요!</p>
+            <div class="map-grid" id="map-grid">
+                </div>
+        </div>
+    </div>
+
+    <div id="log">> 게임이 시작되었습니다. 돈을 모아 지도의 가맹점들을 늘려보세요!</div>
+</div>
+
+<script>
+    // --- 게임 상태 데이터 ---
+    let gameState = {
+        gold: 500,
+        potLevel: 1,
+        toppingLevel: 1,
+        ownedShops: 0,        // 인수한 가게 수
+        currentToppings: [],
+        isCooking: false
+    };
+
+    // 가맹점 기획 데이터 (인수액 상승폭 반영을 위한 기본 구조)
+    const baseShopCost = 500; // 첫 가맹점 인수 비용
+    const shopData = [
+        { id: 1, name: "1호점 (홍대점)", profit: 30, activeEvent: null },
+        { id: 2, name: "2호점 (강남점)", profit: 70, activeEvent: null },
+        { id: 3, name: "3호점 (부산점)", profit: 120, activeEvent: null },
+        { id: 4, name: "4호점 (제주점)", profit: 200, activeEvent: null },
+        { id: 5, name: "5호점 (명동점)", profit: 350, activeEvent: null },
+        { id: 6, name: "6호점 (해외직영)", profit: 600, activeEvent: null }
+    ];
+
+    // 돌발 문제 후보 목록
+    const eventPool = [
+        { text: "⚠️ 물 조절 실패 민원!", solution: "스프 투하하기", reward: 300 },
+        { text: "⚠️ 단골 손님 불만!", solution: "곱빼기 서비스 제공", reward: 500 },
+        { text: "⚠️ 파괴왕 위생 점검!", solution: "대청소 실시하기", reward: 800 },
+        { text: "⚠️ 리뷰 별점 테러 발생!", solution: "진심 어린 사과문 쓰기", reward: 1200 }
+    ];
+
+    const toppingData = {
+        '계란': { cost: 20, value: 40 },
+        '파': { cost: 10, value: 20 },
+        '대게': { cost: 150, value: 300 }
+    };
+
+    let COST = { potUpgrade: 300, toppingUpgrade: 400 };
+
+    // --- UI 및 편의 기능 ---
+    function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${message}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function switchTab(tab) {
+        document.getElementById('tab-kitchen').classList.remove('active');
+        document.getElementById('tab-map').classList.remove('active');
+        document.getElementById('content-kitchen').classList.remove('active');
+        document.getElementById('content-map').classList.remove('active');
+
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        document.getElementById(`content-${tab}`).classList.add('active');
+        if(tab === 'map') renderMap();
+    }
+
+    // 현재 소유 가맹점 수에 따른 다음 인수 비용 계산 (지수적 상승)
+    function getCurrentShopCost() {
+        return baseShopCost * Math.pow(2.5, gameState.ownedShops);
+    }
+
+    // 초당 총 자동수익 계산
+    function getTotalGPS() {
+        let gps = 0;
+        for(let i=0; i<gameState.ownedShops; i++) {
+            gps += shopData[i].profit;
+        }
+        return gps;
+    }
+
+    function updateUI() {
+        let currentShopCost = getCurrentShopCost();
+        document.getElementById('gold').innerText = Math.floor(gameState.gold).toLocaleString();
+        document.getElementById('gps').innerText = `가맹점 자동 수익: ${getTotalGPS().toLocaleString()}원/초`;
+        document.getElementById('selected-pot').innerText = `Lv.${gameState.potLevel} 냄비`;
+        document.getElementById('selected-toppings').innerText = gameState.currentToppings.length > 0 ? gameState.currentToppings.join(', ') : '없음';
+        document.getElementById('shop-cost').innerText = Math.floor(currentShopCost).toLocaleString();
+
+        // 버튼 제어
+        if (!gameState.isCooking) {
+            document.getElementById('btn-top-egg').disabled = gameState.gold < toppingData['계란'].cost || gameState.currentToppings.length >= 4;
+            document.getElementById('btn-top-green').disabled = gameState.gold < toppingData['파'].cost || gameState.currentToppings.length >= 4;
+            document.getElementById('btn-top-crab').disabled = gameState.gold < toppingData['대게'].cost || gameState.currentToppings.length >= 4;
+            document.getElementById('btn-serve').disabled = false;
+        }
+
+        document.getElementById('btn-upgrade-pot').disabled = gameState.gold < COST.potUpgrade;
+        document.getElementById('btn-upgrade-topping').disabled = gameState.gold < COST.toppingUpgrade;
+        
+        // 최대 소유 가능 가맹점은 6개로 제한
+        document.getElementById('btn-buy-shop').disabled = (gameState.gold < currentShopCost) || (gameState.ownedShops >= shopData.length);
+        
+        // 현재 활성화된 이벤트 개수 세기
+        let activeEvents = shopData.filter(s => s.activeEvent !== null).length;
+        document.getElementById('event-count').innerText = activeEvents;
+    }
+
+    // --- 주방 시스템 함수 ---
+    function buyTopping(name) {
+        if (gameState.isCooking || gameState.currentToppings.length >= 4) return;
+        let price = toppingData[name].cost;
+        if (gameState.gold >= price) {
+            gameState.gold -= price;
+            gameState.currentToppings.push(name);
+            log(`[토핑] 라면에 ${name}을 넣었습니다. (-${price}원)`);
+            updateUI();
+        }
+    }
+
+    function cookRamyeon() {
+        if (gameState.isCooking) return;
+        gameState.isCooking = true;
+        
+        // 모든 조리관련 버튼 락
+        document.getElementById('btn-top-egg').disabled = true;
+        document.getElementById('btn-top-green').disabled = true;
+        document.getElementById('btn-top-crab').disabled = true;
+        document.getElementById('btn-serve').disabled = true;
+
+        const container = document.getElementById('cooldown-container');
+        const bar = document.getElementById('cooldown-bar');
+        container.style.display = 'block';
+        bar.style.width = '0%';
+
+        let start = null;
+        let duration = 3000;
+
+        function frame(timestamp) {
+            if (!start) start = timestamp;
+            let progress = timestamp - start;
+            bar.style.width = Math.min((progress / duration) * 100, 100) + '%';
+            if (progress < duration) requestAnimationFrame(frame);
+            else finishCooking();
+        }
+        requestAnimationFrame(frame);
+    }
+
+    function finishCooking() {
+        let basePrice = 120;
+        let toppingBonus = 0;
+        gameState.currentToppings.forEach(t => {
+            toppingBonus += toppingData[t].value * gameState.toppingLevel;
+        });
+
+        let earned = (basePrice + toppingBonus) * gameState.potLevel;
+        gameState.gold += earned;
+        log(`✨ [조리 완료] 시식가 평가단이 라면 대금으로 ${earned}원을 지불했습니다.`);
+
+        gameState.currentToppings = [];
+        gameState.isCooking = false;
+        document.getElementById('cooldown-container').style.display = 'none';
+        updateUI();
+    }
+
+    function upgradePot() {
+        if (gameState.gold >= COST.potUpgrade) {
+            gameState.gold -= COST.potUpgrade;
+            gameState.potLevel++;
+            log(`🔧 [본점 업그레이드] 화력이 더 강력한 냄비로 교체! (Lv.${gameState.potLevel})`);
+            updateUI();
+        }
+    }
+
+    function upgradeToppingMultiplier() {
+        if (gameState.gold >= COST.toppingUpgrade) {
+            gameState.gold -= COST.toppingUpgrade;
+            gameState.toppingLevel++;
+            log(`🧪 [소스 연구] 토핑들의 조화력이 증가합니다. (Lv.${gameState.toppingLevel})`);
+            updateUI();
+        }
+    }
+
+    // --- 🏠 가맹점 인수 시스템 (가격 상승 로직 포함) ---
+    function buyShop() {
+        let currentCost = getCurrentShopCost();
+        if (gameState.gold >= currentCost && gameState.ownedShops < shopData.length) {
+            gameState.gold -= currentCost;
+            gameState.ownedShops++;
+            let newShop = shopData[gameState.ownedShops - 1];
+            log(`🏢 [가맹 성공] 큰 돈을 들여 '${newShop.name}'을 인수했습니다! (초당 수익: +${newShop.profit}원)`);
+            updateUI();
+            if(document.getElementById('content-map').classList.contains('active')) renderMap();
+        }
+    }
+
+    // --- 🗺️ 지도 렌더링 및 문제 해결 시스템 ---
+    function renderMap() {
+        const grid = document.getElementById('map-grid');
+        grid.innerHTML = '';
+
+        shopData.forEach((shop, index) => {
+            const node = document.createElement('div');
+            node.className = 'map-node';
+
+            if (index >= gameState.ownedShops) {
+                // 미인수 가게
+                node.classList.add('locked');
+                node.innerHTML = `<h3>미오픈 체인점</h3><p>인수 후 해금됩니다.</p>`;
+            } else {
+                // 인수한 가게
+                node.innerHTML = `<h3>${shop.name}</h3><p style="color:#2ecc71; font-weight:bold;">자동 수익: ${shop.profit}원/초</p>`;
+                
+                // 해당 가맹점에 문제가 발생해 있는 경우
+                if (shop.activeEvent !== null) {
+                    node.classList.add('event-active');
+                    const ev = shop.activeEvent;
+                    node.innerHTML += `
+                        <div class="event-box">
+                            ${ev.text}<br>
+                            <button style="margin-top:5px; background:#c0392b; font-size:11px;" onclick="solveShopEvent(${index})">
+                                🔧 ${ev.solution} (${ev.reward}원 보상)
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    node.innerHTML += `<p style="color:#7f8c8d; font-size:12px;">✅ 안정적으로 운영 중</p>`;
+                }
+            }
+            grid.appendChild(node);
+        });
+    }
+
+    // 가맹점 문제 해결하기 버튼 클릭 시
+    function solveShopEvent(shopIndex) {
+        let shop = shopData[shopIndex];
+        if (shop.activeEvent) {
+            let reward = shop.activeEvent.reward;
+            gameState.gold += reward;
+            log(`🎉 [출장 해결] '${shop.name}'의 문제를 해결하여 보너스 보상 [${reward}원]을 받았습니다!`);
+            shop.activeEvent = null; // 이벤트 클리어
+            updateUI();
+            renderMap();
+        }
+    }
+
+    // --- 백그라운드 타이머 시스템 ---
+    // 1. 초당 가맹점 자동 수익 정산
+    setInterval(() => {
+        let totalGPS = getTotalGPS();
+        if (totalGPS > 0) {
+            gameState.gold += totalGPS;
+            updateUI();
+        }
+    }, 1000);
+
+    // 2. 12초마다 이미 인수한 가맹점 중 무작위로 돌발 문제 발생시킴
+    setInterval(() => {
+        if (gameState.ownedShops > 0) {
+            // 소유한 가게 중 하나를 무작위 선택
+            let randomIndex = Math.floor(Math.random() * gameState.ownedShops);
+            let targetShop = shopData[randomIndex];
+
+            // 이미 문제가 있는 곳이 아니라면 새로운 문제 등록
+            if (targetShop.activeEvent === null) {
+                let randomEvent = eventPool[Math.floor(Math.random() * eventPool.length)];
+                targetShop.activeEvent = randomEvent;
+                log(`🚨 [경고] '${targetShop.name}'에 문제가 발생했습니다! 지도를 확인하세요.`);
+                updateUI();
+                if(document.getElementById('content-map').classList.contains('active')) renderMap();
+            }
+        }
+    }, 12000);
+
+    // 최초 초기화
+    updateUI();
+</script>
+
+</body>
+</html>

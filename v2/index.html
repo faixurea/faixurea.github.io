@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 끓이기 타이쿤 - 베타 버전</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #3a3a3a;
+            color: #333;
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+        }
+        /* 화면 크기를 더 넓게 확장 */
+        .game-container {
+            width: 800px;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; color: #ff4500; margin-top: 0; font-size: 32px; }
+        
+        /* 상단 전광판 인터페이스 */
+        .status-bar {
+            background: #222;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 20px;
+            display: flex;
+            justify-content: space-between;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .status-bar .gold-text { color: #ffd700; }
+        .status-bar .gps-text { color: #00ff7f; font-size: 16px; align-self: center; }
+
+        /* 메인 게임 레이아웃 (좌우 분할) */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .section {
+            background: #f9f9f9;
+            border: 2px solid #e0e0e0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .section h3 { margin-top: 0; margin-bottom: 15px; color: #222; border-bottom: 2px solid #ff7f50; padding-bottom: 5px; }
+        
+        /* 버튼 인터페이스 스타일 */
+        button {
+            background: #ff7f50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        button:hover { background: #ff4500; transform: translateY(-1px); }
+        button:active { transform: translateY(1px); }
+        button:disabled { background: #ccc !important; cursor: not-allowed; transform: none; }
+        
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+        
+        /* 조리실 및 프로그레스 바 */
+        .cooking-display {
+            background: #eaeaea;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            min-height: 50px;
+            font-size: 15px;
+        }
+        .cooldown-bar-container {
+            width: 100%;
+            background: #ddd;
+            height: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        .cooldown-bar {
+            width: 0%;
+            height: 100%;
+            background: #ff4500;
+            transition: width 0.1s linear;
+        }
+
+        /* 큰 서빙 버튼 */
+        .serve-btn {
+            width: 100%; 
+            background: #2ed573; 
+            font-size: 18px; 
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .serve-btn:hover { background: #26af5f; }
+
+        /* 대형 로그 창 */
+        #log {
+            height: 120px;
+            overflow-y: auto;
+            background: #222;
+            color: #00ff00;
+            padding: 12px;
+            font-size: 13px;
+            font-family: 'Courier New', Courier, monospace;
+            border-radius: 6px;
+            margin-top: 20px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🍜 라면 타이쿤 (Beta V1.1)</h1>
+    
+    <div class="status-bar">
+        <div>보유 자금: <span id="gold" class="gold-text">500</span>원</div>
+        <div id="gps" class="gps-text">자동 수익: 0원/초</div>
+    </div>
+
+    <div class="main-layout">
+        <div>
+            <div class="section">
+                <h3>1. 라면 조리 및 토핑 추가</h3>
+                <div class="cooking-display">
+                    <strong>현재 냄비:</strong> <span id="selected-pot">Lv.1 양은냄비</span><br>
+                    <strong>넣은 토핑:</strong> <span id="selected-toppings">없음</span>
+                </div>
+                
+                <p style="font-size:13px; color:#666; margin-bottom:5px;">※ 토핑 클릭 시 비용이 즉시 차감됩니다.</p>
+                <div class="flex-wrap">
+                    <button id="btn-top-egg" onclick="buyTopping('계란')">계란 (+20원)</button>
+                    <button id="btn-top-green" onclick="buyTopping('파')">파 (+10원)</button>
+                    <button id="btn-top-crab" onclick="buyTopping('대게')">대게 (+150원)</button>
+                </div>
+
+                <div class="cooldown-bar-container" id="cooldown-container">
+                    <div class="cooldown-bar" id="cooldown-bar"></div>
+                </div>
+                <button id="btn-serve" class="serve-btn" onclick="cookRamyeon()">
+                    🔥 시식가에게 라면 내놓기
+                </button>
+            </div>
+        </div>
+
+        <div>
+            <div class="section" style="margin-bottom: 20px;">
+                <h3>2. 주방 업그레이드</h3>
+                <div class="flex-wrap">
+                    <button id="btn-upgrade-pot" onclick="upgradePot()">냄비 레벨업 (비용: 300원)</button>
+                    <button id="btn-upgrade-topping" onclick="upgradeToppingMultiplier()">토핑 연구 (비용: 400원)</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>3. 체인점 부동산 인수</h3>
+                <p>소유한 가맹점 수: <span id="shop-count" style="font-weight:bold; color:#ff4500;">0</span>개</p>
+                <button id="btn-buy-shop" style="background:#1e90ff; width:100%;" onclick="buyShop()">
+                    🏠 동네 분식집 인수 (비용: 1000원)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="log">> 게임이 시작되었습니다. 초기 자금 500원이 지급되었습니다.</div>
+</div>
+
+<script>
+    // --- 초기 게임 데이터 세팅 (시작 자금 500원으로 증가) ---
+    let gameState = {
+        gold: 500,
+        potLevel: 1,      
+        toppingLevel: 1,  
+        shopCount: 0,     
+        currentToppings: [],
+        isCooking: false // 쿨타임 체크용 변수
+    };
+
+    // 고정 밸런스 데이터
+    const COST = {
+        potUpgrade: 300,
+        toppingUpgrade: 400,
+        shop: 1000
+    };
+
+    // 토핑 구매 가격 및 맛 가치
+    const toppingData = {
+        '계란': { cost: 20, value: 40 },
+        '파': { cost: 10, value: 20 },
+        '대게': { cost: 150, value: 300 }
+    };
+
+    function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${message}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // 인터페이스 실시간 업데이트
+    function updateUI() {
+        document.getElementById('gold').innerText = gameState.gold.toLocaleString();
+        document.getElementById('gps').innerText = `자동 수익: ${(gameState.shopCount * 50).toLocaleString()}원/초`;
+        document.getElementById('selected-pot').innerText = `Lv.${gameState.potLevel} 냄비`;
+        document.getElementById('selected-toppings').innerText = gameState.currentToppings.length > 0 ? gameState.currentToppings.join(', ') : '없음';
+        document.getElementById('shop-count').innerText = gameState.shopCount;
+
+        // 쿨타임 중이 아닐 때만 조리/토핑 버튼 제어
+        if (!gameState.isCooking) {
+            document.getElementById('btn-top-egg').disabled = gameState.gold < toppingData['계란'].cost || gameState.currentToppings.length >= 4;
+            document.getElementById('btn-top-green').disabled = gameState.gold < toppingData['파'].cost || gameState.currentToppings.length >= 4;
+            document.getElementById('btn-top-crab').disabled = gameState.gold < toppingData['대게'].cost || gameState.currentToppings.length >= 4;
+            document.getElementById('btn-serve').disabled = false;
+        } else {
+            // 조리 중일 때는 모든 조리 관련 버튼 비활성화
+            document.getElementById('btn-top-egg').disabled = true;
+            document.getElementById('btn-top-green').disabled = true;
+            document.getElementById('btn-top-crab').disabled = true;
+            document.getElementById('btn-serve').disabled = true;
+        }
+
+        // 업그레이드 및 건물 구매 버튼 상시 제어
+        document.getElementById('btn-upgrade-pot').disabled = gameState.gold < COST.potUpgrade;
+        document.getElementById('btn-upgrade-topping').disabled = gameState.gold < COST.toppingUpgrade;
+        document.getElementById('btn-buy-shop').disabled = gameState.gold < COST.shop;
+    }
+
+    // 토핑 돈주고 구매하기 리뉴얼
+    function buyTopping(name) {
+        if (gameState.isCooking) return;
+        
+        if (gameState.currentToppings.length >= 4) {
+            log("냄비가 가득 찼습니다! (최대 4개 토핑)");
+            return;
+        }
+
+        let price = toppingData[name].cost;
+        if (gameState.gold >= price) {
+            gameState.gold -= price;
+            gameState.currentToppings.push(name);
+            log(`[구매] 라면에 ${name} 토핑을 추가했습니다. (-${price}원)`);
+            updateUI();
+        } else {
+            log(`돈이 부족하여 ${name} 토핑을 살 수 없습니다.`);
+        }
+    }
+
+    // 라면 완성 및 판매 (쿨타임 시스템 적용)
+    function cookRamyeon() {
+        if (gameState.isCooking) return;
+
+        gameState.isCooking = true;
+        updateUI();
+
+        // 쿨타임 애니메이션 게이지 시작 (3초 쿨타임)
+        const cooldownContainer = document.getElementById('cooldown-container');
+        const cooldownBar = document.getElementById('cooldown-bar');
+        cooldownContainer.style.display = 'block';
+        cooldownBar.style.width = '0%';
+
+        let start = null;
+        const duration = 3000; // 3초
+
+        function animateBar(timestamp) {
+            if (!start) start = timestamp;
+            let progress = timestamp - start;
+            let percentage = Math.min((progress / duration) * 100, 100);
+            cooldownBar.style.width = percentage + '%';
+
+            if (progress < duration) {
+                requestAnimationFrame(animateBar);
+            } else {
+                // 3초 조리 끝난 후 정산 처리
+                finishCooking();
+            }
+        }
+        requestAnimationFrame(animateBar);
+    }
+
+    // 실제 라면 서빙 및 골드 지급 계산
+    function finishCooking() {
+        let basePrice = 120; // 기본 라면 가격 증가
+        let toppingBonus = 0;
+        
+        gameState.currentToppings.forEach(t => {
+            toppingBonus += toppingData[t].value * gameState.toppingLevel;
+        });
+
+        // 최종 판매가 = (기본가 + 토핑가치) * 냄비 레벨
+        let finalEarned = (basePrice + toppingBonus) * gameState.potLevel;
+        gameState.gold += finalEarned;
+
+        log(`✨ [판매 완료] 시식가가 라면을 격찬하며 ${finalEarned}원을 냈습니다!`);
+
+        // 초기화 및 데이터 리셋
+        gameState.currentToppings = [];
+        gameState.isCooking = false;
+        document.getElementById('cooldown-container').style.display = 'none';
+        updateUI();
+    }
+
+    // 냄비 업그레이드
+    function upgradePot() {
+        if (gameState.gold >= COST.potUpgrade) {
+            gameState.gold -= COST.potUpgrade;
+            gameState.potLevel++;
+            log(`🔧 [업그레이드] 냄비를 개조했습니다! 현재 Lv.${gameState.potLevel} (판매 배율 상승)`);
+            updateUI();
+        }
+    }
+
+    // 토핑 가치 업그레이드
+    function upgradeToppingMultiplier() {
+        if (gameState.gold >= COST.toppingUpgrade) {
+            gameState.gold -= COST.toppingUpgrade;
+            gameState.toppingLevel++;
+            log(`🧪 [연구 완료] 토핑 요리 연구 Lv.${gameState.toppingLevel} 달성! (토핑 판매 가치 대폭 상승)`);
+            updateUI();
+        }
+    }
+
+    // 가게 구매 (방치형 수익)
+    function buyShop() {
+        if (gameState.gold >= COST.shop) {
+            gameState.gold -= COST.shop;
+            gameState.shopCount++;
+            log(`🏢 [부동산] 가맹점을 개설했습니다! 이제 초당 50원씩 자동 입금됩니다.`);
+            updateUI();
+        }
+    }
+
+    // 타이머 자동화 시스템 (가게 수익 지급)
+    setInterval(() => {
+        if (gameState.shopCount > 0) {
+            gameState.gold += (gameState.shopCount * 50); // 가게당 초당 50원 지급으로 상향
+            updateUI();
+        }
+    }, 1000);
+
+    // 초기 화면 실행
+    updateUI();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 재벌 타이쿤 - 글로벌 코딩 버전</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #2c3e50; color: #333; margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+        .game-container {
+            width: 1050px; background: #ffffff; padding: 25px;
+            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 { text-align: center; color: #e74c3c; margin: 0 0 20px 0; font-size: 30px; }
+        
+        .status-bar {
+            background: #1a252f; color: #fff; padding: 15px 25px;
+            border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 20px;
+            display: flex; justify-content: space-between;
+        }
+        .status-bar .gold-text { color: #f1c40f; }
+        .status-bar .gold-minus { color: #e74c3c !important; }
+        .status-bar .gps-text { color: #2ecc71; font-size: 16px; align-self: center; }
+
+        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 12px; font-size: 16px; background: #7f8c8d;
+            color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+        .tab-btn.active { background: #e67e22; }
+
+        .game-content { display: none; }
+        .game-content.active { display: block; }
+
+        .layout-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; }
+        .section { background: #f8f9fa; border: 2px solid #bdc3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .section h3 { margin-top: 0; margin-bottom: 12px; color: #2c3e50; border-bottom: 2px solid #e67e22; padding-bottom: 5px; }
+
+        button { background: #e67e22; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+        
+        /* 코딩 및 콘솔 */
+        .console-box { display: grid; grid-template-columns: 1fr 1.1fr; gap: 15px; }
+        .code-input {
+            width: 100%; height: 160px; background: #111; color: #00ff00;
+            font-family: monospace; border: 2px solid #333; padding: 10px;
+            box-sizing: border-box; border-radius: 6px; font-size: 13px; resize: none;
+        }
+        .help-box { background: #eef2f5; padding: 10px; border-radius: 6px; font-size: 11px; line-height: 1.6; border-left: 4px solid #3498db; max-height:160px; overflow-y:auto; }
+        
+        /* 글로벌 파트너십 인터페이스 */
+        .global-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .country-card { background: #fcfcfc; border: 2px solid #34495e; padding: 15px; border-radius: 8px; text-align: center; }
+        .country-card.locked { background: #eaeaea; border-color: #bdc3c7; color: #7f8c8d; }
+
+        #log {
+            height: 120px; overflow-y: auto; background: #1a252f; color: #3498db;
+            padding: 12px; font-size: 13px; font-family: monospace; border-radius: 6px; margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🍜 라면 재벌 타이쿤 (글로벌 파트너십 편)</h1>
+    
+    <div class="status-bar">
+        <div>보유 자금: <span id="gold" class="gold-text">500</span>원</div>
+        <div id="gps" class="gps-text">총 자동 수익: 0원/초</div>
+    </div>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" id="tab-kitchen" onclick="switchTab('kitchen')">🤖 주방 & AI 콘솔</button>
+        <button class="tab-btn" id="tab-global" onclick="switchTab('global')">✈️ 글로벌 파트너십 비즈니스</button>
+    </div>
+
+    <div id="content-kitchen" class="game-content active">
+        <div class="layout-grid">
+            <div>
+                <div class="section">
+                    <h3>🤖 AI 직원 자동화 콘솔</h3>
+                    <div class="console-box">
+                        <div>
+                            <textarea id="command-input" class="code-input" placeholder="cook()&#10;upgrade_pot()&#10;partner(1)"></textarea>
+                            <button style="width:100%; margin-top:5px; background:#2ecc71;" onclick="runCommand()">명령 전송 (Run)</button>
+                        </div>
+                        <div class="help-box">
+                            <strong>[확장 명령어 도움말]</strong><br>
+                            • <code>cook()</code> : 라면을 끓여 즉시 팝니다.<br>
+                            • <code>upgrade_pot()</code> : 냄비를 자동으로 레벨업합니다.<br>
+                            • <code>partner(국가번호)</code> : 해당 국가 기업과 협력 계약을 맺습니다.<br>
+                            &nbsp;&nbsp;(1: 미국 마트기업 / 2: 일본 편의점)<br>
+                            • <code>clear_debt()</code> : 자금이 마이너스일 때 사채를 갚아 0원으로 복구합니다. (수수료: 1,000원 고정)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>1. 수동 조리 및 가맹점 확장</h3>
+                    <div class="flex-wrap" style="margin-bottom: 10px;">
+                        <button style="background:#27ae60;" onclick="cookRamyeon()">🔥 직접 라면 끓이기 (+120원)</button>
+                    </div>
+                    <button id="btn-buy-shop" style="background:#2980b9; width:100%;" onclick="buyShop()">
+                        🏠 가맹점 추가 인수 (비용: <span id="shop-cost">500</span>원)
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <div class="section">
+                    <h3>2. 본점 강화</h3>
+                    <p>현재 냄비 레벨: <span id="pot-level" style="font-weight:bold; color:#e67e22;">1</span></p>
+                    <button id="btn-upgrade-pot" onclick="upgradePot()">냄비 강화 (<span id="pot-cost">300</span>원)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-global" class="game-content">
+        <div class="section">
+            <h3>🌎 해외 기업 협력 및 리스크 투자</h3>
+            <p style="color:#e74c3c; font-weight:bold; font-size:13px;">
+                ⚠️ 경고: 협력 시 75% 확률로 대박이 나지만, 25% 확률로 기술을 유출당해 자금이 마이너스가 될 수 있습니다!
+            </p>
+            <div class="global-grid">
+                <div class="country-card" id="card-usa">
+                    <h2>🇺🇸 1. 미국 거대마트 (Wall-Ramen)</h2>
+                    <p>요구 조건: 자금 2,000원 이상</p>
+                    <p style="color:#2ecc71; font-weight:bold;">성공 시: 초당 자동수익 +500원</p>
+                    <p style="color:#e74c3c; font-weight:bold;">실패 시: 계약 사기로 -1,500원 손실</p>
+                    <button id="btn-partner-usa" onclick="partnerBusiness(1)">🤝 협력 계약 체결하기</button>
+                    <p id="status-usa" style="font-weight:bold; margin-top:10px; color:#95a5a6;">[계약 미체결]</p>
+                </div>
+
+                <div class="country-card" id="card-japan">
+                    <h2>🇯🇵 2. 일본 편의점 (Ramen-Mart)</h2>
+                    <p>요구 조건: 자금 5,000원 이상</p>
+                    <p style="color:#2ecc71; font-weight:bold;">성공 시: 초당 자동수익 +1,200원</p>
+                    <p style="color:#e74c3c; font-weight:bold;">실패 시: 소송 패소로 -4,000원 손실</p>
+                    <button id="btn-partner-japan" onclick="partnerBusiness(2)">🤝 협력 계약 체결하기</button>
+                    <p id="status-japan" style="font-weight:bold; margin-top:10px; color:#95a5a6;">[계약 미체결]</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="log">> 글로벌 무대로 진출하세요! 리스크를 감수한 파트너십만이 억만장자가 되는 지름길입니다.</div>
+</div>
+
+<script>
+    let gameState = {
+        gold: 500,
+        potLevel: 1,
+        ownedShops: 0,
+        partnerUSA: false,   // 미국 협력 여부
+        partnerJapan: false   // 일본 협력 여부
+    };
+
+    function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${message}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function switchTab(tab) {
+        document.getElementById('tab-kitchen').classList.remove('active');
+        document.getElementById('tab-global').classList.remove('active');
+        document.getElementById('content-kitchen').classList.remove('active');
+        document.getElementById('content-global').classList.remove('active');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        document.getElementById(`content-${tab}`).classList.add('active');
+    }
+
+    function getCurrentShopCost() { return 500 * Math.pow(2.5, gameState.ownedShops); }
+    function getPotUpgradeCost() { return 300 * gameState.potLevel; }
+
+    function getTotalGPS() {
+        let shopProfit = gameState.ownedShops * 60;
+        let usaProfit = gameState.partnerUSA ? 500 : 0;
+        let japanProfit = gameState.partnerJapan ? 1200 : 0;
+        return shopProfit + usaProfit + japanProfit;
+    }
+
+    function updateUI() {
+        const goldSpan = document.getElementById('gold');
+        goldSpan.innerText = Math.floor(gameState.gold).toLocaleString();
+        
+        // 돈이 마이너스면 빨간색으로 변경
+        if (gameState.gold < 0) {
+            goldSpan.className = "gold-text gold-minus";
+        } else {
+            goldSpan.className = "gold-text";
+        }
+
+        document.getElementById('gps').innerText = `총 자동 수익: ${getTotalGPS().toLocaleString()}원/초`;
+        document.getElementById('pot-level').innerText = gameState.potLevel;
+        document.getElementById('shop-cost').innerText = Math.floor(getCurrentShopCost()).toLocaleString();
+        document.getElementById('pot-cost').innerText = getPotUpgradeCost().toLocaleString();
+
+        // 수동 버튼들 비활성화 조건
+        document.getElementById('btn-upgrade-pot').disabled = gameState.gold < getPotUpgradeCost();
+        document.getElementById('btn-buy-shop').disabled = gameState.gold < getCurrentShopCost();
+        
+        // 파트너십 버튼 예외 처리
+        document.getElementById('btn-partner-usa').disabled = gameState.gold < 2000 || gameState.partnerUSA;
+        document.getElementById('btn-partner-japan').disabled = gameState.gold < 5000 || gameState.partnerJapan;
+    }
+
+    // --- 🤖 확장 프로그래밍 언어 해석기 ---
+    function runCommand() {
+        const input = document.getElementById('command-input').value.trim();
+        
+        if (input === "cook()") {
+            cookRamyeon();
+        } else if (input === "upgrade_pot()") {
+            if (gameState.gold >= getPotUpgradeCost()) upgradePot();
+            else log("[콘솔 오류] 자금이 부족하여 냄비를 강화할 수 없습니다.");
+        } else if (input.startsWith("partner(") && input.endsWith(")")) {
+            let num = parseInt(input.replace("partner(", "").replace(")", ""));
+            if (num === 1 || num === 2) {
+                partnerBusiness(num);
+            } else {
+                log("[콘솔 오류] 존재하지 않는 국가 번호입니다. (1: 미국, 2: 일본)");
+            }
+        } else if (input === "clear_debt()") {
+            if (gameState.gold < 0) {
+                gameState.gold = 0;
+                log("[콘솔] 사채 청산 명령 작동. 자금을 0원으로 긴급 복구했습니다. (대신 수수료로 나중에 충당됩니다)");
+                updateUI();
+            } else {
+                log("[콘솔] 현재 파산 상태(마이너스 자금)가 아닙니다.");
+            }
+        } else {
+            log("[구문 에러] 등록되지 않은 글로벌 명령어입니다.");
+        }
+    }
+
+    // --- 비즈니스 로직 ---
+    function cookRamyeon() {
+        let price = 120 * gameState.potLevel;
+        gameState.gold += price;
+        log(`[주방] 직원이 라면을 끓여서 서빙했습니다. (+${price}원)`);
+        updateUI();
+    }
+
+    function upgradePot() {
+        let cost = getPotUpgradeCost();
+        if(gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.potLevel++;
+            log(`[업그레이드] 냄비 개조 완료! 현재 최고 등급 Lv.${gameState.potLevel}`);
+            updateUI();
+        }
+    }
+
+    function buyShop() {
+        let cost = getCurrentShopCost();
+        if(gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.ownedShops++;
+            log(`[국내 확장] 국내 가맹점을 추가 오픈했습니다. (초당 수익 +60원)`);
+            updateUI();
+        }
+    }
+
+    // --- ✈️ 글로벌 파트너십 (확률형 리스크 투자) ---
+    function partnerBusiness(countryId) {
+        let rand = Math.random(); // 0.0 ~ 1.0 사이의 난수 발생
+        
+        if (countryId === 1) { // 미국
+            if (gameState.partnerUSA) return;
+            if (gameState.gold < 2000) { log("미국 기업 협력에 필요한 최소 자금(2,000원)이 부족합니다."); return; }
+            
+            // 75% 확률로 성공, 25% 확률로 사기당해 마이너스
+            if (rand > 0.25) {
+                gameState.partnerUSA = true;
+                log("🇺🇸 [파트너십 대성공!] 미국 Wall-Ramen 전역 매장에 수출을 시작합니다! (초당 수익 +500원)");
+                document.getElementById('status-usa').innerText = "🤝 계약 체결 완료 (수익 중)";
+                document.getElementById('status-usa').style.color = "#2ecc71";
+            } else {
+                gameState.gold -= 1500;
+                log("🚨 [계약 사기 발생!!] 미국 유령 종이회사에 속아 계약 보증금을 뜯겼습니다. (-1,500원 손실)");
+            }
+        } 
+        else if (countryId === 2) { // 일본
+            if (gameState.partnerJapan) return;
+            if (gameState.gold < 5000) { log("일본 기업 협력에 필요한 최소 자금(5,000원)이 부족합니다."); return; }
+            
+            if (rand > 0.25) {
+                gameState.partnerJapan = true;
+                log("🇯🇵 [파트너십 대성공!] 일본 전역 편의점에 PB 상품 입점 확정! (초당 수익 +1,200원)");
+                document.getElementById('status-japan').innerText = "🤝 계약 체결 완료 (수익 중)";
+                document.getElementById('status-japan').style.color = "#2ecc71";
+            } else {
+                gameState.gold -= 4000;
+                log("🚨 [특허 소송 패소!!] 현지 레시피 도용 소송에 휘말려 거액의 벌금을 뱉어냈습니다. (-4,000원 손실)");
+            }
+        }
+        updateUI();
+    }
+
+    // --- 방치형 자동 정산 시스템 ---
+    setInterval(() => {
+        let totalGPS = getTotalGPS();
+        // 자금이 마이너스 상태여도 자동 수익은 계속 정산되므로 서서히 빚을 갚아나갈 수 있습니다.
+        gameState.gold += totalGPS; 
+        updateUI();
+    }, 1000);
+
+    updateUI();
+</script>
+</body>
+</html>

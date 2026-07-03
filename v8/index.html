@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 재벌 타이쿤 - 글로벌 대기업 & 저택 편</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #2c3e50; color: #333; margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+        .game-container {
+            width: 1150px; background: #ffffff; padding: 25px;
+            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 { text-align: center; color: #e74c3c; margin: 0 0 20px 0; font-size: 30px; }
+        
+        .status-bar {
+            background: #1a252f; color: #fff; padding: 15px 25px;
+            border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 20px;
+            display: flex; justify-content: space-between;
+        }
+        .status-bar .gold-text { color: #f1c40f; }
+        .status-bar .gold-minus { color: #e74c3c !important; }
+        .status-bar .gps-text { color: #2ecc71; font-size: 16px; align-self: center; }
+
+        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 12px; font-size: 16px; background: #7f8c8d;
+            color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+        .tab-btn.active { background: #e67e22; }
+
+        .game-content { display: none; }
+        .game-content.active { display: block; }
+
+        .layout-grid { display: grid; grid-template-columns: 1.1fr 1.1fr; gap: 20px; }
+        .section { background: #f8f9fa; border: 2px solid #bdc3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .section h3 { margin-top: 0; margin-bottom: 12px; color: #2c3e50; border-bottom: 2px solid #e67e22; padding-bottom: 5px; }
+
+        button { background: #e67e22; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;}
+        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+        
+        /* 가맹점 리스트 (15개 배치 대응) */
+        .shop-list-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 250px; overflow-y: auto; padding: 5px; }
+        .shop-box { background: #fff; border: 2px solid #bdc3c7; padding: 8px; border-radius: 6px; text-align: center; font-size: 12px; }
+        .shop-box.protected { border-color: #2ecc71; background: #e6fffa; }
+        .shop-box.danger { border-color: #e74c3c; background: #fff5f5; }
+
+        /* 내 집 꾸미기 인테리어 */
+        .housing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .luxury-card { background: #fff; border: 2px solid #d4af37; border-radius: 8px; padding: 15px; text-align: center; }
+        .luxury-owned { color: #d4af37; font-weight: bold; margin-top: 5px; }
+
+        /* 글로벌 비즈니스 */
+        .global-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .country-card { background: #fcfcfc; border: 2px solid #34495e; padding: 15px; border-radius: 8px; text-align: center; }
+
+        /* 직원 관리 */
+        #staff-container { max-height: 250px; overflow-y: auto; padding-right: 5px; }
+        .staff-card { background: #edf2f7; border: 1px solid #cbd5e0; padding: 8px; margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .staff-input { width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-size: 11px; }
+
+        #log {
+            height: 100px; overflow-y: auto; background: #1a252f; color: #3498db;
+            padding: 12px; font-size: 13px; font-family: monospace; border-radius: 6px; margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🍜 라면 글로벌 재벌 타이쿤 (완전판)</h1>
+    
+    <div class="status-bar">
+        <div>보유 자금: <span id="gold" class="gold-text">1000</span>원</div>
+        <div id="gps" class="gps-text">총 자동 수익: 0원/초</div>
+    </div>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" id="tab-kitchen" onclick="switchTab('kitchen')">💼 국내 사업 & 인사과</button>
+        <button class="tab-btn" id="tab-global" onclick="switchTab('global')">✈️ 해외 무역 (리셋: <span id="reset-timer">60</span>초)</button>
+        <button class="tab-btn" id="tab-home" onclick="switchTab('home')">🏰 내 집 꾸미기 (보너스: +<span id="home-bonus">0</span>%)</button>
+    </div>
+
+    <div id="content-kitchen" class="game-content active">
+        <div class="layout-grid">
+            <div>
+                <div class="section">
+                    <h3>👥 인사 관리 (직원 수: <span id="staff-count">0</span>/10)</h3>
+                    <button id="btn-hire-staff" style="background:#9b59b6; width:100%; margin-bottom:12px;" onclick="hireStaff()">
+                        👨‍🍳 직원 추가 고용 (비용: 1,500원)
+                    </button>
+                    <div id="staff-container"></div>
+                </div>
+                <div class="section">
+                    <h3>1. 본점 수동 조리</h3>
+                    <button style="background:#27ae60; width:100%;" onclick="cookRamyeon()">🔥 라면 직접 서빙 (+200원)</button>
+                </div>
+            </div>
+
+            <div>
+                <div class="section">
+                    <h3>2. 국내 가맹점 관리 (<span id="shop-display-count">0</span>/15)</h3>
+                    <button id="btn-buy-shop" style="background:#2980b9; width:100%; margin-bottom:12px;" onclick="buyShop()">
+                        🏠 가맹점 확장 개설 (비용: <span id="shop-cost">500</span>원)
+                    </button>
+                    <div class="shop-list-grid" id="shop-list-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-global" class="game-content">
+        <div class="section">
+            <h3>🌎 해외 기업 제휴 마켓</h3>
+            <p style="color:#e74c3c; font-weight:bold; font-size:13px;">⚠️ 주의: 75% 확률로 대박이 나지만, 25% 확률로 사기 무역에 걸려 돈이 마이너스가 될 수 있습니다!</p>
+            <div class="global-grid">
+                <div class="country-card">
+                    <h2>🇺🇸 미국 유통 체인</h2>
+                    <p>계약 최소 요구액: 3,000원</p>
+                    <p style="color:#2ecc71; font-weight:bold;">성공 시: +<span id="val-usa-profit">0</span>원/초</p>
+                    <p style="color:#e74c3c; font-weight:bold;">실패 시 손실: -<span id="val-usa-loss">0</span>원</p>
+                    <button id="btn-partner-usa" onclick="partnerBusiness('usa')">🤝 무역 계약 체결</button>
+                    <p id="status-usa" style="font-weight:bold; margin-top:5px; color:#95a5a6;">[계약 대기중]</p>
+                </div>
+
+                <div class="country-card">
+                    <h2>🇯🇵 일본 편의점 유통</h2>
+                    <p>계약 최소 요구액: 5,000원</p>
+                    <p style="color:#2ecc71; font-weight:bold;">성공 시: +<span id="val-japan-profit">0</span>원/초</p>
+                    <p style="color:#e74c3c; font-weight:bold;">실패 시 손실: -<span id="val-japan-loss">0</span>원</p>
+                    <button id="btn-partner-japan" onclick="partnerBusiness('japan')">🤝 무역 계약 체결</button>
+                    <p id="status-japan" style="font-weight:bold; margin-top:5px; color:#95a5a6;">[계약 대기중]</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-home" class="game-content">
+        <div class="section">
+            <h3>🏰 회장님의 대저택 인테리어 자산</h3>
+            <p>수집품을 모을 때마다 명성이 올라가 전체 모든 자동 수익(가맹점+해외)에 영구 보너스 퍼센트가 붙습니다.</p>
+            <div class="housing-grid">
+                <div class="luxury-card">
+                    <h2>💡 명품 럭셔리 조명</h2>
+                    <p>가격: 5,000원</p>
+                    <p style="color:#2ecc71;">효과: 총 자동수익 +5% 버프</p>
+                    <button id="btn-buy-luxury-0" onclick="buyLuxury(0)">배치하기</button>
+                    <p id="owned-luxury-0" class="luxury-owned">[미소유]</p>
+                </div>
+                <div class="luxury-card">
+                    <h2>✨ 24K 순금 인테리어 장식</h2>
+                    <p>가격: 15,000원</p>
+                    <p style="color:#2ecc71;">효과: 총 자동수익 +15% 버프</p>
+                    <button id="btn-buy-luxury-1" onclick="buyLuxury(1)">배치하기</button>
+                    <p id="owned-luxury-1" class="luxury-owned">[미소유]</p>
+                </div>
+                <div class="luxury-card">
+                    <h2>🎨 피카소 진품 예술작품</h2>
+                    <p>가격: 50,000원</p>
+                    <p style="color:#2ecc71;">효과: 총 자동수익 +30% 버프</p>
+                    <button id="btn-buy-luxury-2" onclick="buyLuxury(2)">배치하기</button>
+                    <p id="owned-luxury-2" class="luxury-owned">[미소유]</p>
+                </div>
+                <div class="luxury-card">
+                    <h2>🏎️ 초호화 하이퍼 슈퍼카</h2>
+                    <p>가격: 150,000원</p>
+                    <p style="color:#2ecc71;">효과: 총 자동수익 +60% 버프</p>
+                    <button id="btn-buy-luxury-3" onclick="buyLuxury(3)">배치하기</button>
+                    <p id="owned-luxury-3" class="luxury-owned">[미소유]</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="log">> 대기업 인사팀과 글로벌 무역팀이 활성화되었습니다.</div>
+</div>
+
+<script>
+    let gameState = {
+        gold: 1000,
+        ownedShops: 0,
+        staffs: [],
+        luxuries: [false, false, false, false],
+        partnerUSA: false,
+        partnerJapan: false,
+        globalResetTime: 60
+    };
+
+    let globalMarket = { usaProfit: 400, usaLoss: 1500, japanProfit: 1000, japanLoss: 3500 };
+    let activeProblems = {};
+
+    function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${message}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.game-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        document.getElementById(`content-${tab}`).classList.add('active');
+        if(tab === 'kitchen') { renderStaff(); renderShops(); }
+    }
+
+    function getCurrentShopCost() { return 500 * Math.pow(1.7, gameState.ownedShops); }
+    
+    function getHomeBonusMultiplier() {
+        const luxuryData = [5, 15, 30, 60];
+        let bonus = 0;
+        gameState.luxuries.forEach((owned, idx) => { if(owned) bonus += luxuryData[idx]; });
+        return bonus;
+    }
+
+    function getTotalGPS() {
+        let shopProfit = gameState.ownedShops * 80;
+        let kitchenStaff = gameState.staffs.filter(s => s.role === 'kitchen').length * 50;
+        let usaProfit = gameState.partnerUSA ? globalMarket.usaProfit : 0;
+        let japanProfit = gameState.partnerJapan ? globalMarket.japanProfit : 0;
+        
+        let totalBase = shopProfit + kitchenStaff + usaProfit + japanProfit;
+        return Math.floor(totalBase * (1 + (getHomeBonusMultiplier() / 100)));
+    }
+
+    function updateUI() {
+        const goldSpan = document.getElementById('gold');
+        goldSpan.innerText = Math.floor(gameState.gold).toLocaleString();
+        goldSpan.className = gameState.gold < 0 ? "gold-text gold-minus" : "gold-text";
+
+        document.getElementById('gps').innerText = `총 자동 수익: ${getTotalGPS().toLocaleString()}원/초`;
+        document.getElementById('shop-cost').innerText = Math.floor(getCurrentShopCost()).toLocaleString();
+        document.getElementById('shop-display-count').innerText = gameState.ownedShops;
+        document.getElementById('staff-count').innerText = gameState.staffs.length;
+        document.getElementById('home-bonus').innerText = getHomeBonusMultiplier();
+
+        document.getElementById('btn-buy-shop').disabled = (gameState.gold < getCurrentShopCost()) || (gameState.ownedShops >= 15);
+        document.getElementById('btn-hire-staff').disabled = (gameState.gold < 1500) || (gameState.staffs.length >= 10);
+
+        document.getElementById('btn-partner-usa').disabled = gameState.gold < 3000 || gameState.partnerUSA;
+        document.getElementById('btn-partner-japan').disabled = gameState.gold < 5000 || gameState.partnerJapan;
+
+        const luxuryCosts = [5000, 15000, 50000, 150000];
+        gameState.luxuries.forEach((owned, idx) => {
+            let btn = document.getElementById(`btn-buy-luxury-${idx}`);
+            if(btn) btn.disabled = owned || gameState.gold < luxuryCosts[idx];
+        });
+    }
+
+    // --- 👥 인사팀 시스템 (최대 10명) ---
+    function hireStaff() {
+        if (gameState.staffs.length >= 10) return;
+        if (gameState.gold >= 1500) {
+            gameState.gold -= 1500;
+            gameState.staffs.push({ id: Date.now() + Math.random(), role: 'kitchen', targetShop: '' });
+            log("👨‍🍳 보직 [주방 행] 직원을 고용했습니다.");
+            renderStaff();
+            updateUI();
+        }
+    }
+
+    function changeRole(staffId, role) {
+        let staff = gameState.staffs.find(s => s.id === staffId);
+        if (staff) {
+            staff.role = role;
+            if (role === 'kitchen') staff.targetShop = '';
+            renderStaff(); renderShops(); updateUI();
+        }
+    }
+
+    function updateTargetShop(staffId, value) {
+        let staff = gameState.staffs.find(s => s.id === staffId);
+        if (staff) { staff.targetShop = value.trim(); renderShops(); }
+    }
+
+    function renderStaff() {
+        const container = document.getElementById('staff-container');
+        container.innerHTML = '';
+        if (gameState.staffs.length === 0) {
+            container.innerHTML = `<p style="color:#7f8c8d; font-size:13px; text-align:center;">고용된 직원이 없습니다.</p>`;
+            return;
+        }
+        gameState.staffs.forEach((staff, index) => {
+            const card = document.createElement('div');
+            card.className = 'staff-card';
+            let isKitchen = staff.role === 'kitchen';
+            card.innerHTML = `
+                <div style="font-size:12px;"><strong>사원 #${index+1}</strong></div>
+                <div class="flex-wrap">
+                    <button style="background:${isKitchen?'#e67e22':'#95a5a6'}; padding:3px 6px; font-size:11px;" onclick="changeRole(${staff.id}, 'kitchen')">주방</button>
+                    <button style="background:${!isKitchen?'#2ecc71':'#95a5a6'}; padding:3px 6px; font-size:11px;" onclick="changeRole(${staff.id}, 'guard')">수호대</button>
+                    ${!isKitchen ? `<input type="text" class="staff-input" placeholder="예: 3호점" value="${staff.targetShop}" oninput="updateTargetShop(${staff.id}, this.value)">` : ''}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // --- 🏠 가맹점 시스템 (최대 15개) ---
+    function buyShop() {
+        if (gameState.ownedShops >= 15) return;
+        let cost = getCurrentShopCost();
+        if(gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.ownedShops++;
+            log(`[출점] 가맹점 ${gameState.ownedShops}호점을 오픈했습니다.`);
+            renderShops(); updateUI();
+        }
+    }
+
+    function renderShops() {
+        const grid = document.getElementById('shop-list-grid');
+        grid.innerHTML = '';
+        let protectedShops = gameState.staffs.filter(s => s.role === 'guard' && s.targetShop !== '').map(s => s.targetShop);
+
+        for(let i=1; i<=gameState.ownedShops; i++) {
+            let sName = `${i}호점`;
+            const box = document.createElement('div');
+            box.className = 'shop-box';
+            if (activeProblems[sName]) {
+                box.classList.add('danger'); box.innerHTML = `<strong>${sName}</strong><br><span style="color:#e74c3c;">⚠️ 위기</span>`;
+            } else if (protectedShops.includes(sName)) {
+                box.classList.add('protected'); box.innerHTML = `<strong>${sName}</strong><br><span style="color:#2ecc71;">🛡️ 보호중</span>`;
+            } else {
+                box.innerHTML = `<strong>${sName}</strong><br><span style="color:#7f8c8d;">정상</span>`;
+            }
+            grid.appendChild(box);
+        }
+    }
+
+    function cookRamyeon() { gameState.gold += 200; log("[수동] 라면을 팔아 현금을 확보했습니다. (+200원)"); updateUI(); }
+
+    // --- ✈️ 1분 리셋 글로벌 파트너십 무역 ---
+    function randomizeGlobalMarket() {
+        globalMarket.usaProfit = Math.floor(Math.random() * 500) + 400;
+        globalMarket.usaLoss = Math.floor(Math.random() * 1200) + 1200;
+        globalMarket.japanProfit = Math.floor(Math.random() * 900) + 800;
+        globalMarket.japanLoss = Math.floor(Math.random() * 2500) + 2500;
+
+        document.getElementById('val-usa-profit').innerText = globalMarket.usaProfit;
+        document.getElementById('val-usa-loss').innerText = globalMarket.usaLoss;
+        document.getElementById('val-japan-profit').innerText = globalMarket.japanProfit;
+        document.getElementById('val-japan-loss').innerText = globalMarket.japanLoss;
+        
+        gameState.partnerUSA = false; gameState.partnerJapan = false;
+        document.getElementById('status-usa').innerText = "[계약 대기중]"; document.getElementById('status-usa').style.color = "#95a5a6";
+        document.getElementById('status-japan').innerText = "[계약 대기중]"; document.getElementById('status-japan').style.color = "#95a5a6";
+        log("🔄 [국제 정세 변경] 글로벌 무역 시세가 새롭게 리셋되었습니다!");
+        updateUI();
+    }
+
+    function partnerBusiness(country) {
+        let isSuccess = Math.random() > 0.25; // 75% 성공 확률
+        if (country === 'usa') {
+            if (isSuccess) {
+                gameState.partnerUSA = true;
+                document.getElementById('status-usa').innerText = "🤝 계약 유지 중"; document.getElementById('status-usa').style.color = "#2ecc71";
+                log(`🇺🇸 미국 유통 계약 성공! 초당 +${globalMarket.usaProfit}원 획득.`);
+            } else {
+                gameState.gold -= globalMarket.usaLoss;
+                log(`🚨 미국 수출길에 문제가 생겨 거액의 위약금을 물어냈습니다. (-${globalMarket.usaLoss}원)`);
+            }
+        } else if (country === 'japan') {
+            if (isSuccess) {
+                gameState.partnerJapan = true;
+                document.getElementById('status-japan').innerText = "🤝 계약 유지 중"; document.getElementById('status-japan').style.color = "#2ecc71";
+                log(`🇯🇵 일본 편의점 수출 성공! 초당 +${globalMarket.japanProfit}원 획득.`);
+            } else {
+                gameState.gold -= globalMarket.japanLoss;
+                log(`🚨 일본 소송 제기로 투자 자금을 일시에 손실했습니다. (-${globalMarket.japanLoss}원)`);
+            }
+        }
+        updateUI();
+    }
+
+    // --- 🏰 하우징 시스템 ---
+    function buyLuxury(idx) {
+        const luxuryCosts = [5000, 15000, 50000, 150000];
+        const names = ["럭셔리 조명", "24K 순금 장식", "피카소 예술작품", "하이퍼 슈퍼카"];
+        if (!gameState.luxuries[idx] && gameState.gold >= luxuryCosts[idx]) {
+            gameState.gold -= luxuryCosts[idx];
+            gameState.luxuries[idx] = true;
+            document.getElementById(`owned-luxury-${idx}`).innerText = "👑 저택 배치 완료";
+            document.getElementById(`owned-luxury-${idx}`).style.color = "#2ecc71";
+            log(`🏰 대저택에 [${names[idx]}]를 도입하여 기업 가치 보너스가 적용됩니다.`);
+            updateUI();
+        }
+    }
+
+    // --- 타이머 ---
+    setInterval(() => {
+        gameState.gold += getTotalGPS();
+        gameState.globalResetTime--;
+        document.getElementById('reset-timer').innerText = gameState.globalResetTime;
+        if (gameState.globalResetTime <= 0) { gameState.globalResetTime = 60; randomizeGlobalMarket(); }
+        updateUI();
+    }, 1000);
+
+    // 12초마다 가맹점 민원 공격
+    setInterval(() => {
+        if (gameState.ownedShops > 0) {
+            let randNum = Math.floor(Math.random() * gameState.ownedShops) + 1;
+            let targetShopName = `${randNum}호점`;
+            let hasGuard = gameState.staffs.some(s => s.role === 'guard' && s.targetShop === targetShopName);
+
+            if (hasGuard) {
+                log(`🛡️ [방어 완료] 수호대 직원이 ${targetShopName}의 민원을 사전 해결했습니다.`);
+            } else {
+                gameState.gold -= 500;
+                log(`🚨 [본사 손실] 수호대 공백 구역인 ${targetShopName}에 악재로 벌금 500원이 청구되었습니다.`);
+                activeProblems[targetShopName] = true; renderShops();
+                setTimeout(() => { activeProblems[targetShopName] = false; renderShops(); }, 2000);
+            }
+            updateUI();
+        }
+    }, 12000);
+
+    randomizeGlobalMarket(); renderShops(); renderStaff(); updateUI();
+</script>
+</body>
+</html>

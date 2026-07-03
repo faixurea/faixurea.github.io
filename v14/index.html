@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라면 글로벌 재벌 타이쿤 - 클라우드 멀티 편</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #2c3e50; color: #333; margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+        .game-container {
+            width: 1150px; background: #ffffff; padding: 25px;
+            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        h1 { text-align: center; color: #e74c3c; margin: 0 0 20px 0; font-size: 30px; }
+        
+        .status-bar {
+            background: #1a252f; color: #fff; padding: 15px 25px;
+            border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 20px;
+            display: flex; justify-content: space-between;
+        }
+        .status-bar .gold-text { color: #f1c40f; }
+        .status-bar .gps-text { color: #2ecc71; font-size: 16px; align-self: center; }
+
+        .tab-menu { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 12px; font-size: 16px; background: #7f8c8d;
+            color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+        .tab-btn.active { background: #e67e22; }
+
+        .game-content { display: none; }
+        .game-content.active { display: block; }
+
+        .layout-grid { display: grid; grid-template-columns: 1.1fr 1.1fr; gap: 20px; }
+        .section { background: #f8f9fa; border: 2px solid #bdc3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .section h3 { margin-top: 0; margin-bottom: 12px; color: #2c3e50; border-bottom: 2px solid #e67e22; padding-bottom: 5px; }
+
+        button { background: #e67e22; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;}
+        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        .flex-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+        
+        .shop-list-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 250px; overflow-y: auto; padding: 5px; }
+        .shop-box { background: #fff; border: 2px solid #bdc3c7; padding: 8px; border-radius: 6px; text-align: center; font-size: 12px; }
+
+        #log {
+            height: 100px; overflow-y: auto; background: #1a252f; color: #3498db;
+            padding: 12px; font-size: 13px; font-family: monospace; border-radius: 6px; margin-top: 15px;
+        }
+
+        .ending-screen {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95); color: #fff; border-radius: 15px;
+            z-index: 9999; text-align: center; padding-top: 10%; box-sizing: border-box;
+        }
+
+        /* 🌐 멀티플레이어 레이아웃 */
+        .multi-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; text-align: center;}
+        .leaderboard-table th, .leaderboard-table td { padding: 10px; border: 1px solid #cbd5e0; font-size: 14px;}
+        .leaderboard-table th { background: #34495e; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div id="ending-layer" class="ending-screen">
+        <div id="ending-title" style="font-size:38px; color:#2ecc71; font-weight:bold; margin-bottom:20px;">🤝 HAPPY ENDING 🤝</div>
+        <div id="ending-content" style="font-size:20px; line-height:2; max-width:700px; margin:0 auto 30px auto;"></div>
+        <button style="background: #2ecc71; font-size: 18px; padding: 12px 24px;" onclick="location.reload()">처음부터 다시하기</button>
+    </div>
+
+    <h1>🍜 라면 재벌 타이쿤 - 클라우드 멀티플레이어</h1>
+    
+    <div class="status-bar">
+        <div>ID: <span id="player-id-tag" style="color:#3498db;">접속중...</span> | 자금: <span id="gold" class="gold-text">1000</span>원</div>
+        <div id="gps" class="gps-text">자동 수익: 0원/초</div>
+    </div>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" id="tab-kitchen" onclick="switchTab('kitchen')">💼 국내 사업</button>
+        <button class="tab-btn" id="tab-multi" onclick="switchTab('multi')" style="background:#8e44ad;">🌐 은하 멀티 서버</button>
+    </div>
+
+    <div id="content-kitchen" class="game-content active">
+        <div class="layout-grid">
+            <div class="section">
+                <h3>1. 본점 수동 조리</h3>
+                <button style="background:#27ae60; width:100%; padding:15px;" onclick="cookRamyeon()">🔥 라면 직접 서빙 (+200원)</button>
+            </div>
+            <div class="section">
+                <h3>2. 가맹점 확장</h3>
+                <button id="btn-buy-shop" style="background:#2980b9; width:100%; padding:12px;" onclick="buyShop()">🏠 가맹점 개설 (비용: <span id="shop-cost">500</span>원)</button>
+                <p style="text-align:center; font-weight:bold; margin-top:10px;">현재 보유 가맹점: <span id="shop-display-count">0</span>개</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-multi" class="game-content">
+        <div class="multi-layout">
+            <div class="section" style="background:#1a252f; color:white;">
+                <h3 style="color:#2ecc71; border-color:#2ecc71;">⚛️ 전 우주 공유 융합 원자로</h3>
+                <p style="font-size:13px; color:#bdc3c7;">이 원자로는 이 게임을 켠 모든 유저가 실시간으로 온도를 공유합니다! 다 함께 온도를 조절해 100% 그리드를 달성하세요.</p>
+                
+                <div style="background:#111a24; padding:20px; border-radius:8px; text-align:center; margin:15px 0; border:2px solid #3498db;">
+                    <div style="font-size:20px; margin-bottom:10px;">현재 원자로 온도: <span id="global-temp" style="color:#e74c3c; font-weight:bold;">??</span> ℃</div>
+                    <div style="font-size:16px; color:#aab7b8; margin-bottom:15px;">안전 영역(40~80℃) 유지 시 공동 그리드 충전: <span id="global-grid" style="color:#2ecc71; font-weight:bold;">0</span>%</div>
+                    
+                    <button onclick="cloudInjectCoolant()" style="background:#3498db; width:80%; padding:12px; font-size:15px;">❄️ 전 우주 원자로에 냉각수 투하 (-15℃)</button>
+                </div>
+                <p style="font-size:11px; color:#e8a7a1; text-align:center;">※ 온도가 너무 높아지거나 낮아지면 그리드가 오르지 않습니다. 다른 유저들과 타이밍을 맞춰 누르세요!</p>
+            </div>
+
+            <div class="section">
+                <h3>🏆 실시간 은하 재벌 순위</h3>
+                <p style="font-size:12px; color:#7f8c8d;">클라우드에 등록된 전 세계 플레이어들의 실시간 자산 순위입니다.</p>
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr><th>순위</th><th>플레이어 ID</th><th>보유 자산</th></tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <tr><td colspan="3">데이터 로딩 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="log">> 서버 연결 대기 중...</div>
+</div>
+
+<script>
+    // -------------------------------------------------------------
+    // 🔥 [필독] 구글 Firebase 설정값을 여기에 입력해야 정상 작동합니다!
+    // -------------------------------------------------------------
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        databaseURL: "YOUR_DATABASE_URL",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    // Firebase 초기화 (설정값이 변경되지 않았으면 데모 모드로 작동)
+    let useCloud = false;
+    let database;
+    let playerId = "User_" + Math.floor(Math.random() * 9000 + 1000);
+
+    if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        useCloud = true;
+    }
+
+    let gameState = {
+        gold: 1000,
+        ownedShops: 0,
+        gameCleared: false
+    };
+
+    // 로컬 백업용 가상 멀티 데이터 (클라우드 미연결 시 사용)
+    let localGlobalTemp = 50;
+    let localGlobalGrid = 0;
+
+    function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML += `<br>> ${message}`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.game-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        document.getElementById(`content-${tab}`).classList.add('active');
+    }
+
+    function cookRamyeon() { gameState.gold += 200; updateUI(); }
+    function getCurrentShopCost() { return 500 * Math.pow(1.7, gameState.ownedShops); }
+    function getTotalGPS() { return gameState.ownedShops * 80; }
+
+    function buyShop() {
+        let cost = getCurrentShopCost();
+        if(gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.ownedShops++;
+            updateUI();
+        }
+    }
+
+    function updateUI() {
+        document.getElementById('gold').innerText = Math.floor(gameState.gold).toLocaleString();
+        document.getElementById('gps').innerText = `자동 수익: ${getTotalGPS().toLocaleString()}원/초`;
+        document.getElementById('shop-cost').innerText = Math.floor(getCurrentShopCost()).toLocaleString();
+        document.getElementById('shop-display-count').innerText = gameState.ownedShops;
+        document.getElementById('btn-buy-shop').disabled = gameState.gold < getCurrentShopCost();
+        document.getElementById('player-id-tag').innerText = playerId;
+
+        // 클라우드 자산 실시간 업로드
+        if (useCloud && !gameState.gameCleared) {
+            database.ref('players/' + playerId).set({
+                gold: gameState.gold,
+                lastSeen: Date.now()
+            });
+        }
+    }
+
+    // ❄️ 전 우주 원자로 냉각수 주입 (클라우드 버튼 클릭)
+    function cloudInjectCoolant() {
+        if (useCloud) {
+            database.ref('reactor/temperature').transaction((currentTemp) => {
+                return Math.max(10, (currentTemp || 50) - 15);
+            });
+            log("❄️ 클라우드 서버 원자로에 냉각수를 주입했습니다! (-15℃)");
+        } else {
+            localGlobalTemp = Math.max(10, localGlobalTemp - 15);
+            log("❄️ [데모 모드] 원자로에 냉각수를 주입했습니다. (-15℃)");
+        }
+    }
+
+    // ⚛️ 클라우드 데이터 실시간 동기화 리스너 등록
+    if (useCloud) {
+        log("🌐 Firebase 클라우드 서버에 성공적으로 연결되었습니다!");
+        
+        // 1. 원자로 온도 및 그리드 실시간 반영
+        database.ref('reactor').on('value', (snapshot) => {
+            let data = snapshot.val();
+            if (data) {
+                document.getElementById('global-temp').innerText = data.temperature;
+                document.getElementById('global-grid').innerText = data.grid;
+                
+                if (data.temperature >= 40 && data.temperature <= 80) {
+                    document.getElementById('global-temp').style.color = "#2ecc71";
+                } else {
+                    document.getElementById('global-temp').style.color = "#e74c3c";
+                }
+
+                if (data.grid >= 100 && !gameState.gameCleared) {
+                    triggerMegaEnding();
+                }
+            }
+        });
+
+        // 2. 글로벌 실시간 랭킹 보드 반영
+        database.ref('players').orderByChild('gold').limitToLast(10).on('value', (snapshot) => {
+            const tbody = document.getElementById('leaderboard-body');
+            tbody.innerHTML = '';
+            let players = [];
+            snapshot.forEach((child) => {
+                players.push({ id: child.key, gold: child.val().gold });
+            });
+            players.reverse(); // 내림차순 정렬
+
+            players.forEach((p, idx) => {
+                let row = `<tr><td>${idx+1}</td><td>${p.id}</td><td>${p.gold.toLocaleString()}원</td></tr>`;
+                tbody.innerHTML += row;
+            });
+        });
+    } else {
+        log("⚠️ Firebase 설정이 비어있어 [싱글 가상 멀티 모드]로 작동합니다. (설정값을 채우면 실제 연동됨)");
+        // 데모용 가짜 리스트 출력
+        document.getElementById('leaderboard-body').innerHTML = `
+            <tr><td>1</td><td>RamenKing_99</td><td>9,999,999원</td></tr>
+            <tr style="background:#e6f7ff;"><td>2</td><td>${playerId} (나)</td><td><span id="rank-my-gold">1,000</span>원</td></tr>
+            <tr><td>3</td><td>AI_Ramen_Master</td><td>500원</td></tr>
+        `;
+    }
+
+    // ⏱️ 메인 루프 (경제 작동 및 1번 유저(방장 역할)가 온도 올리기 시뮬레이션)
+    setInterval(() => {
+        if (gameState.gameCleared) return;
+        gameState.gold += getTotalGPS();
+        updateUI();
+
+        if (!useCloud) {
+            // 데모 모드 전용 원자로 작동 시뮬레이션
+            localGlobalTemp += Math.floor(Math.random() * 5) + 3;
+            if (localGlobalTemp >= 40 && localGlobalTemp <= 80) {
+                localGlobalGrid += 2;
+                if (localGlobalGrid > 100) localGlobalGrid = 100;
+            }
+            document.getElementById('global-temp').innerText = localGlobalTemp;
+            document.getElementById('global-grid').innerText = localGlobalGrid;
+            document.getElementById('rank-my-gold').innerText = gameState.gold.toLocaleString();
+
+            if (localGlobalGrid >= 100) triggerMegaEnding();
+        }
+    }, 1000);
+
+    // 👑 서버 전용 원자로 온도 상승/그리드 연산 루프 (클라우드가 켜졌을 때 1초마다 대표로 갱신)
+    // 실제 운영 시에는 백엔드에서 돌려야 하나, 여기서는 유저 중 한 명이 주기적으로 온도를 올리도록 연산합니다.
+    setInterval(() => {
+        if (useCloud && playerId) {
+            // 원자로 온도 1초마다 상승 트랜잭션
+            database.ref('reactor/temperature').transaction((currentTemp) => {
+                return (currentTemp || 50) + 2; 
+            });
+
+            // 안전 구역일 때 그리드 상승 트랜잭션
+            database.ref('reactor').transaction((currentReactor) => {
+                if (!currentReactor) return { temperature: 50, grid: 0 };
+                if (currentReactor.temperature >= 40 && currentReactor.temperature <= 80) {
+                    currentReactor.grid = Math.min(100, (currentReactor.grid || 0) + 1);
+                }
+                return currentReactor;
+            });
+        }
+    }, 1500);
+
+    function triggerMegaEnding() {
+        gameState.gameCleared = true;
+        document.getElementById('ending-content').innerHTML = `
+            <strong>"축하합니다! 전 우주의 플레이어들이 힘을 합쳤습니다!"</strong><br><br>
+            클라우드 망으로 연결된 모든 은하계 라면 재벌들이 힘을 모아 온도를 제어해 냈습니다.<br>
+            마침내 100% 동기화된 청정 그리드 에너지가 인공지능 코어와 융합되었습니다.<br><br>
+            모든 인간 플레이어와 AI가 하나로 연결되어 싸움을 멈추고,<br>
+            우주 전체에 평화와 무한한 라면을 공급하는 <strong>[글로벌 라면 멀티 유토피아]</strong>를 달성했습니다!<br><br>
+            <span style="color:#2ecc71; font-weight:bold;">🏆 전 우주 협동 멀티 엔딩 클리어! 🏆</span>
+        `;
+        document.getElementById('ending-layer').style.display = 'block';
+    }
+
+    updateUI();
+</script>
+</body>
+</html>
